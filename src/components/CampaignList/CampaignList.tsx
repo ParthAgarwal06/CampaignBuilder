@@ -1,11 +1,20 @@
-import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import CampaignCard from '../CampaignCard/CampaignCard';
+import PrimaryButton from '../PrimaryButton/PrimaryButton';
 import { CampaignChannel } from '../ChannelChip/ChannelChip';
 import { CampaignStatus } from '../StatusBadge/StatusBadge';
 import { useAppDispatch } from '../../app/hooks';
-import { deleteCampaign, updateCampaignStatus } from '../../features/campaigns/campaignSlice';
+import {
+  deleteCampaign,
+  updateCampaignStatus,
+} from '../../features/campaigns/campaignSlice';
 
 export type Campaign = {
   id: string;
@@ -19,22 +28,53 @@ type CampaignListProps = {
   campaigns: Campaign[];
   loading?: boolean;
   error?: string | null;
-  //onDelete?: (id: string) => void;
-  //onMarkSent?: (id: string) => void;
 };
+
+const PAGE_SIZE = 3;
 
 export default function CampaignList({
   campaigns,
   loading = false,
   error,
 }: CampaignListProps) {
-    const dispatch = useAppDispatch();
-    const onDelete = (id : string) => {
-        dispatch(deleteCampaign(id));
+  const dispatch = useAppDispatch();
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(campaigns.length / PAGE_SIZE);
+
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+
+  const paginatedCampaigns = campaigns.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
     }
-    const onMarkSent = (id : string) => {
-        dispatch(updateCampaignStatus(id));
+
+    if (campaigns.length === 0) {
+      setCurrentPage(1);
     }
+  }, [campaigns.length, currentPage, totalPages]);
+
+  const onDelete = (id: string) => {
+    dispatch(deleteCampaign(id));
+  };
+
+  const onMarkSent = (id: string) => {
+    dispatch(updateCampaignStatus(id));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage((previousPage) => Math.max(previousPage - 1, 1));
+  };
+
+  const goToNextPage = () => {
+    setCurrentPage((previousPage) =>
+      Math.min(previousPage + 1, totalPages)
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.stateContainer}>
@@ -61,23 +101,51 @@ export default function CampaignList({
   }
 
   return (
-    <FlatList
-      data={campaigns}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContent}
-      pagingEnabled
-      renderItem={({ item }) => (
-        <CampaignCard
-          id = {item.id}
-          title={item.title}
-          message={item.message}
-          channel={item.channel}
-          status={item.status}
-          onDelete={() => onDelete?.(item.id)}
-          onMarkSent={() => onMarkSent?.(item.id)}
-        />
+    <View>
+      <FlatList
+        data={paginatedCampaigns}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        scrollEnabled={false}
+        renderItem={({ item }) => (
+          <CampaignCard
+            id={item.id}
+            title={item.title}
+            message={item.message}
+            channel={item.channel}
+            status={item.status}
+            onDelete={() => onDelete(item.id)}
+            onMarkSent={() => onMarkSent(item.id)}
+          />
+        )}
+      />
+
+      {totalPages > 1 && (
+        <View style={styles.paginationContainer}>
+          <View style={styles.paginationButtonWrapper}>
+            <PrimaryButton
+              title="Previous"
+              variant="secondary"
+              onPress={goToPreviousPage}
+              disabled={currentPage === 1}
+            />
+          </View>
+
+          <Text style={styles.pageText}>
+            Page {currentPage} of {totalPages}
+          </Text>
+
+          <View style={styles.paginationButtonWrapper}>
+            <PrimaryButton
+              title="Next"
+              variant="primary"
+              onPress={goToNextPage}
+              disabled={currentPage === totalPages}
+            />
+          </View>
+        </View>
       )}
-    />
+    </View>
   );
 }
 
@@ -114,6 +182,27 @@ const styles = StyleSheet.create({
   stateMessage: {
     fontSize: 14,
     color: '#6B7280',
+    textAlign: 'center',
+  },
+
+  paginationContainer: {
+    marginTop: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+
+  paginationButtonWrapper: {
+    flex: 1,
+  },
+
+  pageText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
     textAlign: 'center',
   },
 });
